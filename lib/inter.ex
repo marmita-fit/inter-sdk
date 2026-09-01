@@ -29,7 +29,7 @@ defmodule Inter do
     end
   end
 
-  def cobranca_charge(%Inter.Webhook.Request{} = request, type \\ :boleto) do
+  def create_webhook(%Inter.Webhook.Request{} = request, type \\ :boleto) do
     Inter.TokenManager.get_client()
     |> Inter.Client.create_webhook(request, type)
   end
