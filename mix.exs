@@ -4,7 +4,7 @@ defmodule Inter.MixProject do
   def project do
     [
       app: :inter,
-      version: "0.6.0",
+      version: "0.7.0",
       elixir: "~> 1.15",
       start_permanent: Mix.env() == :prod,
       name: "Inter",
@@ -28,7 +28,8 @@ defmodule Inter.MixProject do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger]
+      extra_applications: [:logger],
+      mod: {Inter.Application, []}
     ]
   end
 
@@ -41,6 +42,7 @@ defmodule Inter.MixProject do
       {:nestru, "~> 1.0"},
       {:eqrcode, "~> 0.2"},
       {:decimal, "~> 2.0"},
+      {:telemetry, "~> 1.2"},
       {:calendar, "~> 1.0", only: :dev},
       {:ex_doc, "~> 0.27", only: :dev, runtime: false},
       {:mox, "~> 1.0", only: :test}

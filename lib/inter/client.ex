@@ -100,14 +100,12 @@ defmodule Inter.Client do
     ]
 
     headers = [{"Content-Type", "application/x-www-form-urlencoded"}]
+    url = client.base_url <> "oauth/v2/token"
 
-    HTTPoison.post(
-      client.base_url <> "oauth/v2/token",
-      {:form, data},
-      headers,
-      client.request_options
-    )
-    |> handle_response(Inter.Token)
+    request(:fetch_token, "POST", url, %{body: Inter.Redact.form_data(data)}, fn ->
+      HTTPoison.post(url, {:form, data}, headers, client.request_options)
+      |> handle_response(:fetch_token, Inter.Token)
+    end)
   end
 
   def pix_charge(%__MODULE__{} = client, %Inter.Pix.Charge.Request{} = request) do
@@ -116,15 +114,13 @@ defmodule Inter.Client do
       {"Authorization", "Bearer " <> client.token.access_token}
     ]
 
-    response =
-      HTTPoison.post(
-        client.base_url <> "pix/v2/cob",
-        Poison.encode!(request |> Nestru.encode!()),
-        headers,
-        client.request_options
-      )
+    body = Poison.encode!(request |> Nestru.encode!())
+    url = client.base_url <> "pix/v2/cob"
 
-    handle_response(response, Inter.Pix.Charge.Response)
+    request(:pix_charge, "POST", url, %{body: body}, fn ->
+      HTTPoison.post(url, body, headers, client.request_options)
+      |> handle_response(:pix_charge, Inter.Pix.Charge.Response)
+    end)
   end
 
   def get_pix(%__MODULE__{} = client, txid) do
@@ -133,18 +129,15 @@ defmodule Inter.Client do
       {"Authorization", "Bearer " <> client.token.access_token}
     ]
 
-    response =
-      HTTPoison.get(
-        client.base_url <> "pix/v2/cob/#{txid}",
-        headers,
-        client.request_options
-      )
+    url = client.base_url <> "pix/v2/cob/#{txid}"
 
-    %__MODULE__{
-      client
-      | request: %{},
-        response: handle_response(response, Inter.Pix.Charge.Response)
-    }
+    response =
+      request(:get_pix, "GET", url, %{txid: txid}, fn ->
+        HTTPoison.get(url, headers, client.request_options)
+        |> handle_response(:get_pix, Inter.Pix.Charge.Response)
+      end)
+
+    %__MODULE__{client | request: %{}, response: response}
   end
 
   def get_cobranca(%__MODULE__{} = client, cod, conta_corrente) do
@@ -154,18 +147,15 @@ defmodule Inter.Client do
       {"X-Conta-Corrente", conta_corrente}
     ]
 
-    response =
-      HTTPoison.get(
-        client.base_url <> "cobranca/v3/cobrancas/#{cod}",
-        headers,
-        client.request_options
-      )
+    url = client.base_url <> "cobranca/v3/cobrancas/#{cod}"
 
-    %__MODULE__{
-      client
-      | request: %{},
-        response: handle_response(response, Inter.Cobranca.Charge.Response)
-    }
+    response =
+      request(:get_cobranca, "GET", url, %{cod: cod}, fn ->
+        HTTPoison.get(url, headers, client.request_options)
+        |> handle_response(:get_cobranca, Inter.Cobranca.Charge.Response)
+      end)
+
+    %__MODULE__{client | request: %{}, response: response}
   end
 
   def cobranca_charge(%__MODULE__{} = client, %Inter.Cobranca.Charge.Request{} = request) do
@@ -175,19 +165,16 @@ defmodule Inter.Client do
       {"X-Conta-Corrente", request.contaCorrente}
     ]
 
-    response =
-      HTTPoison.post(
-        client.base_url <> "cobranca/v3/cobrancas",
-        Poison.encode!(request |> Nestru.encode!()),
-        headers,
-        client.request_options
-      )
+    body = Poison.encode!(request |> Nestru.encode!())
+    url = client.base_url <> "cobranca/v3/cobrancas"
 
-    %__MODULE__{
-      client
-      | request: request,
-        response: handle_response(response, Inter.Cobranca.Charge.Response.SimpleResponse)
-    }
+    response =
+      request(:cobranca_charge, "POST", url, %{body: body}, fn ->
+        HTTPoison.post(url, body, headers, client.request_options)
+        |> handle_response(:cobranca_charge, Inter.Cobranca.Charge.Response.SimpleResponse)
+      end)
+
+    %__MODULE__{client | request: request, response: response}
   end
 
   def create_webhook(%__MODULE__{} = client, %Inter.Webhook.Request{} = request, type \\ :boleto) do
@@ -203,19 +190,16 @@ defmodule Inter.Client do
         :pix -> "pix/v2/webhook/#{request.chavePix}"
       end
 
-    response =
-      HTTPoison.put(
-        client.base_url <> path,
-        Poison.encode!(request |> Nestru.encode!()),
-        headers,
-        client.request_options
-      )
+    body = Poison.encode!(request |> Nestru.encode!())
+    url = client.base_url <> path
 
-    %__MODULE__{
-      client
-      | request: request,
-        response: handle_response(response, Inter.Webhook.Response)
-    }
+    response =
+      request(:create_webhook, "PUT", url, %{body: body}, fn ->
+        HTTPoison.put(url, body, headers, client.request_options)
+        |> handle_response(:create_webhook, Inter.Webhook.Response)
+      end)
+
+    %__MODULE__{client | request: request, response: response}
   end
 
   def get_webhook(%__MODULE__{} = client, %Inter.Webhook.Request{} = request, type \\ :boleto) do
@@ -231,40 +215,65 @@ defmodule Inter.Client do
         :pix -> "pix/v2/webhook/#{request.chavePix}"
       end
 
-    response =
-      HTTPoison.get(
-        client.base_url <> path,
-        headers,
-        client.request_options
-      )
+    url = client.base_url <> path
 
-    %__MODULE__{
-      client
-      | request: request,
-        response: handle_response(response, Inter.Webhook.Response)
-    }
+    response =
+      request(:get_webhook, "GET", url, %{}, fn ->
+        HTTPoison.get(url, headers, client.request_options)
+        |> handle_response(:get_webhook, Inter.Webhook.Response)
+      end)
+
+    %__MODULE__{client | request: request, response: response}
   end
 
-  defp handle_response({:ok, %HTTPoison.Response{status_code: 200, body: body}}, type),
-    do: body |> Jason.decode!() |> Nestru.decode!(type)
+  defp request(operation, method, url, extra_metadata, fun) do
+    Inter.Telemetry.span(operation, Map.merge(%{method: method, url: url}, extra_metadata), fun)
+  end
 
-  defp handle_response({:ok, %HTTPoison.Response{status_code: 201, body: body}}, type),
-    do: body |> Jason.decode!() |> Nestru.decode!(type)
+  @doc false
+  def handle_response({:ok, %HTTPoison.Response{status_code: status, body: body}}, _operation, type)
+      when status in [200, 201] do
+    value = body |> Jason.decode!() |> Nestru.decode!(type)
+    {value, %{status_code: status, result: :ok}}
+  end
 
-  defp handle_response(
-         {:ok, %HTTPoison.Response{status_code: 403, body: body} = response},
-         _type
-       ),
-       do: {:error, body, response}
+  def handle_response(
+        {:ok, %HTTPoison.Response{status_code: 403, body: body} = response},
+        _operation,
+        _type
+      ) do
+    {{:error, body, response}, %{status_code: 403, result: :error, reason: body}}
+  end
 
-  defp handle_response(
-         {:ok, %HTTPoison.Response{status_code: 400, body: body}} = response,
-         _type
-       ),
-       do: {:error, body |> Jason.decode!(), response}
+  def handle_response(
+        {:ok, %HTTPoison.Response{status_code: 400, body: body} = response},
+        _operation,
+        _type
+      ) do
+    decoded = body |> Jason.decode!()
+    {{:error, decoded, response}, %{status_code: 400, result: :error, reason: decoded}}
+  end
 
-  defp handle_response({:ok, %HTTPoison.Response{status_code: 429}} = response, _type),
-    do: {:error, "You've been rate-limited, try again later (429 error)", response}
+  def handle_response(
+        {:ok, %HTTPoison.Response{status_code: 429} = response},
+        _operation,
+        _type
+      ) do
+    reason = "You've been rate-limited, try again later (429 error)"
+    {{:error, reason, response}, %{status_code: 429, result: :error, reason: reason}}
+  end
 
-  defp handle_response(response, _type), do: {:error, "Failed to obtain OAuth token", response}
+  def handle_response(
+        {:ok, %HTTPoison.Response{status_code: status, body: body} = response},
+        operation,
+        _type
+      ) do
+    reason = "#{operation} returned an unexpected status code (#{status}): #{body}"
+    {{:error, reason, response}, %{status_code: status, result: :error, reason: body}}
+  end
+
+  def handle_response({:error, %HTTPoison.Error{reason: reason} = error}, operation, _type) do
+    message = "#{operation} failed due to a network/connection error: #{inspect(reason)}"
+    {{:error, message, error}, %{result: :error, reason: reason}}
+  end
 end

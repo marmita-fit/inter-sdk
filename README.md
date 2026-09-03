@@ -10,7 +10,7 @@ by adding `inter` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:inter, "~> 0.6.0"}
+    {:inter, "~> 0.7.0"}
   ]
 end
 ```
@@ -92,6 +92,65 @@ pix_charge_request = %Inter.Pix.Charge.Request{
 
 Inter.Client.new(client_id, client_secret, scope, grant_type, api_cert, api_key)
  |> Inter.pix_charge(pix_charge_request)
+```
+
+## Debug e observabilidade
+
+Toda chamada HTTP feita pelo `Inter.Client` (fetch de token, PIX, cobrança,
+webhook) emite eventos [`:telemetry`](https://hexdocs.pm/telemetry) sob o
+prefixo `[:inter, :request, ...]` (`:start`, `:stop`, `:exception`), com
+metadata como `operation`, `method`, `url`, `status_code`, `request_id` e
+`reason` (quando há erro).
+
+Por padrão, um handler já vem anexado e loga cada chamada via `Logger`:
+
+- `debug` — início do request (inclui o corpo, redigindo `client_secret`,
+  `cert_file`, `key_file` e `access_token`)
+- `info` — sucesso (2xx)
+- `warning` — erro do cliente (4xx)
+- `error` — erro do servidor (5xx), rate limit (429), timeout ou falha de
+  rede/conexão
+
+Cada linha é prefixada com `[Inter][<request_id>]`, o que permite
+correlacionar o início e o fim (ou erro) da mesma chamada nos logs.
+
+```
+[debug] [Inter][a1b2c3d4e5f6] iniciando pix_charge POST https://cdpj.partners.bancointer.com.br/pix/v2/cob body="..."
+[error] [Inter][a1b2c3d4e5f6] pix_charge failed due to a network/connection error: :timeout (30004ms)
+```
+
+Isso resolve o cenário mais comum de suporte: quando um `pix_charge` (ou
+qualquer outra chamada) falha por timeout, erro de rede ou um status HTTP
+inesperado (ex. 500), a mensagem de erro devolvida e logada sempre identifica
+a operação e a causa real — nunca mais uma mensagem genérica de token sem
+relação com o problema.
+
+### Configuração
+
+```elixir
+# config/config.exs da sua aplicação (não deste SDK)
+config :inter,
+  # desliga o log automático de corpo de request/response (mantém status/duração/erro)
+  log_bodies: false,
+  # desliga totalmente o handler de logs padrão, caso queira só o seu próprio
+  attach_default_logger: false
+```
+
+### Plugando suas próprias métricas/alertas
+
+Como a instrumentação é feita via `:telemetry`, dá pra anexar handlers
+próprios (ex. contar falhas de PIX, mandar pro Datadog/Sentry) sem precisar
+mexer neste SDK:
+
+```elixir
+:telemetry.attach(
+  "my-app-inter-alerts",
+  [:inter, :request, :stop],
+  fn _event, _measurements, %{operation: :pix_charge, result: :error} = metadata, _config ->
+    MyApp.Alerts.notify("Falha ao gerar PIX: #{inspect(metadata.reason)}")
+  end,
+  nil
+)
 ```
 
 **How to run locally?**
