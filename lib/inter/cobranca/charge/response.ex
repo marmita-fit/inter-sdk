@@ -9,6 +9,21 @@ defmodule Inter.Cobranca.Charge.Response do
     defstruct codigoSolicitacao: nil
   end
 
+  defmodule PdfResponse do
+    @derive [Nestru.Encoder, Nestru.Decoder]
+    defstruct pdf: nil
+
+    @doc """
+    Decodes the base64-encoded `pdf` field into raw PDF bytes.
+
+    ## Examples
+
+        iex> Inter.Cobranca.Charge.Response.PdfResponse.decode(%Inter.Cobranca.Charge.Response.PdfResponse{pdf: "aGVsbG8="})
+        {:ok, "hello"}
+    """
+    def decode(%__MODULE__{pdf: pdf}), do: Base.decode64(pdf)
+  end
+
   defmodule Cobranca do
     @derive [Nestru.Encoder, Nestru.Decoder]
     defstruct codigoSolicitacao: nil,

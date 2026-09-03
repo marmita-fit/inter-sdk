@@ -29,6 +29,16 @@ defmodule Inter do
     end
   end
 
+  @doc """
+  Fetches the boleto PDF (base64-encoded) for a `codigoSolicitacao`.
+
+  Use `Inter.Cobranca.Charge.Response.PdfResponse.decode/1` to get the raw
+  PDF bytes out of the response.
+  """
+  def get_cobranca_pdf(cod, conta_corrente) do
+    Inter.TokenManager.get_client() |> Inter.Client.get_cobranca_pdf(cod, conta_corrente)
+  end
+
   def cobranca_charge(%Inter.Webhook.Request{} = request, type \\ :boleto) do
     Inter.TokenManager.get_client()
     |> Inter.Client.create_webhook(request, type)

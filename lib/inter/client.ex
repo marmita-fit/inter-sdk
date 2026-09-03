@@ -168,6 +168,27 @@ defmodule Inter.Client do
     }
   end
 
+  def get_cobranca_pdf(%__MODULE__{} = client, cod, conta_corrente) do
+    headers = [
+      {"Content-Type", "application/json"},
+      {"Authorization", "Bearer " <> client.token.access_token},
+      {"X-Conta-Corrente", conta_corrente}
+    ]
+
+    response =
+      HTTPoison.get(
+        client.base_url <> "cobranca/v3/cobrancas/#{cod}/pdf",
+        headers,
+        client.request_options
+      )
+
+    %__MODULE__{
+      client
+      | request: %{},
+        response: handle_response(response, Inter.Cobranca.Charge.Response.PdfResponse)
+    }
+  end
+
   def cobranca_charge(%__MODULE__{} = client, %Inter.Cobranca.Charge.Request{} = request) do
     headers = [
       {"Content-Type", "application/json"},
